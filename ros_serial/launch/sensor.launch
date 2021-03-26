@@ -1,0 +1,8 @@
+<launch>
+
+<node pkg="ros_serial" type="serial_encoder" name="serial_encoder">
+</node>
+<node pkg="ros_serial" type="serial_imu" name="serial_imu">
+</node>
+
+</launch>
