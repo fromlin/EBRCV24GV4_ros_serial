@@ -1,8 +1,7 @@
 #include "ros/ros.h"
 #include "serial/serial.h"
 #include "sensor_msgs/Imu.h"
-//#include <sys/signal.h>
-//#include <sys/ioctl.h>
+#include "rosgraph_msgs/Clock.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,11 +11,11 @@
 #include <fcntl.h>
 
 #define IMU_BUF_SIZE       26
+#define PI           3.141592
 
 serial::Serial            ser;
 sensor_msgs::Imu          imu;
 uint8_t     buf[IMU_BUF_SIZE];
-//uint16_t mbuf[IMU_BUF_SIZE/2];
 double   ibuf[IMU_BUF_SIZE/2];
 
 
@@ -48,13 +47,14 @@ bool array_checksum(){
 
 void passing(){
   if(array_checksum()){
+    imu.header.frame_id = "base_link";
     imu.orientation.z = ibuf[2] / 10000.;
     imu.orientation.y = ibuf[3] / 10000.;
     imu.orientation.x = ibuf[4] / 10000.;
     imu.orientation.w = ibuf[5] / 10000.;
-    imu.angular_velocity.x = ibuf[6] / 10.;
-    imu.angular_velocity.y = ibuf[7] / 10.;
-    imu.angular_velocity.z = ibuf[8] / 10.;
+    imu.angular_velocity.x = (ibuf[6] / 10.) * PI /180.;
+    imu.angular_velocity.y = (ibuf[7] / 10.) * PI /180.;
+    imu.angular_velocity.z = (ibuf[8] / 10.) * PI /180.;
     imu.linear_acceleration.x = ibuf[9] / 1000.;
     imu.linear_acceleration.y = ibuf[10] / 1000.;
     imu.linear_acceleration.z = ibuf[11] / 1000.;
@@ -68,6 +68,10 @@ void passing(){
   }
 }
 
+void ClockCallback(const rosgraph_msgs::Clock::ConstPtr &clk){
+  imu.header.stamp.sec = clk->clock.sec;
+  imu.header.stamp.nsec = clk->clock.nsec;
+}
 
 
 bool Initialization(){
@@ -101,11 +105,13 @@ bool Initialization(){
 
 
 
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "serial_imu");
   ros::NodeHandle nh;
-  ros::Publisher ipub = nh.advertise<sensor_msgs::Imu>("/imu_data",100);
+  ros::Publisher  ipub = nh.advertise<sensor_msgs::Imu>("/imu_data",100);
+  ros::Subscriber cpub = nh.subscribe("/clock", 1, ClockCallback);
 
   std::string port;
   nh.param<std::string>("port", port, "/dev/ttyUSB0");
@@ -132,7 +138,7 @@ int main(int argc, char **argv)
 
   Initialization();
 
-  ros::Rate loop_rate(10);     // 100ms (1Hz -> 1s)
+  ros::Rate loop_rate(100);     // 100ms (1Hz -> 1s)
   while(ros::ok()){
     ros::spinOnce();
     if(ser.available())
