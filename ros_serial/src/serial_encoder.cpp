@@ -1,40 +1,90 @@
+/***
+ * This example expects the serial port has a loopback on it.
+ *
+ * Alternatively, you could use an Arduino:
+ *
+ * <pre>
+ *  void setup() {
+ *    Serial.begin(<insert your baudrate here>);
+ *  }
+ *
+ *  void loop() {
+ *    if (Serial.available()) {
+ *      Serial.write(Serial.read());
+ *    }
+ *  }
+ * </pre>
+ */
+
 #include <ros/ros.h>
 #include <serial/serial.h>
 #include <std_msgs/String.h>
-#include <std_msgs/Float64.h>
-//#include <std_msgs/Empty.h>
+#include <std_msgs/Int16.h>
+#include <std_msgs/Empty.h>
 #include <string>
 
-#define ENCODER_BUF_SIZE       12
+#define BUF_SIZE       10
 
-serial::Serial               ser;
-std_msgs::String          result;
-std_msgs::Float64        encoder;
-uint8_t    buf[ENCODER_BUF_SIZE];
-double    ebuf[ENCODER_BUF_SIZE];
+serial::Serial ser;
+std_msgs::Int16 encoder;
+uint8_t     buf[BUF_SIZE];
+
+// void write_callback(const std_msgs::String::ConstPtr& msg){
+//     //ROS_INFO_STREAM("Writing to serial port: " << msg->data);
+//     ser.write(msg->data);
+//     double encoder = stod(msg->data);
+//     printf("Sub >> encoder theta : %.2lf\n", encoder);
+// }
+
+// void write_callback(const std_msgs::Int16::ConstPtr& msg){
+//     printf("Sub >> encoder theta : %d\n", msg->data/100.0);
+// }
 
 bool array_checksum(){
-  uint16_t sum = 0;
-  for(int i = 0 ; i < ENCODER_BUF_SIZE-2 ; i++){
-    sum += buf[i];
-  }
+  uint32_t sum = 0;
+  if(buf[0] != 's') return false;
 
-  if((buf[ENCODER_BUF_SIZE-1]) == sum)
+  for(int i = 1 ; i < BUF_SIZE-3 ; i++){
+    sum += buf[i];
+    //printf("buf[%d] : %d\n", i ,buf[i]);
+  }
+  //printf("sum >> %d", sum);
+  if(((sum%256) == buf[BUF_SIZE-3]) && ((sum%17) == buf[BUF_SIZE-2])){
+    printf("Checksum Good!\n");
     return true;
+  }
   else {
+    printf("Checksum Err!>> buf[6] : %d, sum%256 : %d\n",buf[BUF_SIZE-1], sum%256);
     return false;
   }
 }
 
+void passing(){
+    if(array_checksum()){
+        double theta, setzero;
+        theta = (double)buf[2] + buf[3] / 100.;
+        if(buf[1] == 1) theta *= (-1);
+        theta = theta*3.141592/180.0;
+        setzero = (double)buf[5] + buf[6] / 100.;
+        if(buf[4] == 1) setzero *= (-1);
+
+        printf("encoder theta >> %.2lf\n", theta);
+        printf("setzero >> %.2lf\n", setzero);
+
+        encoder.data = theta*1000.0;
+    }
+}
 
 int main (int argc, char** argv){
     ros::init(argc, argv, "serial_encoder");
     ros::NodeHandle nh;
-    ros::Publisher epub = nh.advertise<std_msgs::Float64>("/encoder_theta", 100);
+
+    //ros::Subscriber write_sub = nh.subscribe("/encoder_theta", 1000, write_callback);
+    ros::Publisher read_pub = nh.advertise<std_msgs::Int16>("/encoder_theta", 1000);
 
     try
     {
-        ser.setPort("/dev/ttyUSB0");
+        ser.setPort("/dev/ttyACM0");
         ser.setBaudrate(115200);
         serial::Timeout to = serial::Timeout::simpleTimeout(1000);
         ser.setTimeout(to);
@@ -48,17 +98,28 @@ int main (int argc, char** argv){
 
     if(ser.isOpen()){
         ROS_INFO_STREAM("Serial Port initialized");
+
+        std_msgs::String test_string;
+        test_string.data = "Send test string!";
+        ser.write(test_string.data);
     }else{
         return -1;
     }
 
-    ros::Rate loop_rate(100);   //100ms
+    ros::Rate loop_rate(1000);
     while(ros::ok()){
+
         ros::spinOnce();
+
         if(ser.available()){
-            result.data = ser.read(ser.available());
-            encoder.data = stod(result.data);
-            epub.publish(encoder);
+            //ROS_INFO_STREAM("Reading from serial port");
+            std_msgs::String result;
+
+            ser.read(buf, BUF_SIZE);
+            passing();
+
+            read_pub.publish(encoder);
+
         }
         loop_rate.sleep();
     }
