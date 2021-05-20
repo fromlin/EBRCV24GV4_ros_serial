@@ -27,7 +27,7 @@
 
 serial::Serial ser;
 std_msgs::Int16 encoder;
-std_msgs::Int16 InitEnco = 0;
+std_msgs::Int16 InitEnco;
 uint8_t     buf[BUF_SIZE];
 
 
@@ -64,7 +64,9 @@ void passing(){
 }
 
 void InitializeCallBack(const std_msgs::String::ConstPtr &msg){
-    InitEnco.data = encoder.data;
+    if(msg->data == "initialize"){
+      InitEnco.data = encoder.data;
+    }
 }
 
 int main (int argc, char** argv){
@@ -110,7 +112,6 @@ int main (int argc, char** argv){
             passing();
 
             read_pub.publish(encoder);
-
         }
         loop_rate.sleep();
     }
