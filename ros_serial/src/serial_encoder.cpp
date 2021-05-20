@@ -29,26 +29,13 @@ serial::Serial ser;
 std_msgs::Int16 encoder;
 uint8_t     buf[BUF_SIZE];
 
-// void write_callback(const std_msgs::String::ConstPtr& msg){
-//     //ROS_INFO_STREAM("Writing to serial port: " << msg->data);
-//     ser.write(msg->data);
-//     double encoder = stod(msg->data);
-//     printf("Sub >> encoder theta : %.2lf\n", encoder);
-// }
-
-// void write_callback(const std_msgs::Int16::ConstPtr& msg){
-//     printf("Sub >> encoder theta : %d\n", msg->data/100.0);
-// }
-
 bool array_checksum(){
   uint32_t sum = 0;
   if(buf[0] != 's') return false;
 
   for(int i = 1 ; i < BUF_SIZE-3 ; i++){
     sum += buf[i];
-    //printf("buf[%d] : %d\n", i ,buf[i]);
   }
-  //printf("sum >> %d", sum);
   if(((sum%256) == buf[BUF_SIZE-3]) && ((sum%17) == buf[BUF_SIZE-2])){
     printf("Checksum Good!\n");
     return true;
@@ -79,7 +66,6 @@ int main (int argc, char** argv){
     ros::init(argc, argv, "serial_encoder");
     ros::NodeHandle nh;
 
-    //ros::Subscriber write_sub = nh.subscribe("/encoder_theta", 1000, write_callback);
     ros::Publisher read_pub = nh.advertise<std_msgs::Int16>("/encoder_theta", 1000);
 
     try
@@ -112,7 +98,6 @@ int main (int argc, char** argv){
         ros::spinOnce();
 
         if(ser.available()){
-            //ROS_INFO_STREAM("Reading from serial port");
             std_msgs::String result;
 
             ser.read(buf, BUF_SIZE);
