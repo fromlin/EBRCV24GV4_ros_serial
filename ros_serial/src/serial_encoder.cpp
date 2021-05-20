@@ -27,7 +27,9 @@
 
 serial::Serial ser;
 std_msgs::Int16 encoder;
+std_msgs::Int16 InitEnco = 0;
 uint8_t     buf[BUF_SIZE];
+
 
 bool array_checksum(){
   uint32_t sum = 0;
@@ -57,9 +59,12 @@ void passing(){
 
         printf("encoder theta >> %.2lf\n", theta);
         printf("setzero >> %.2lf\n", setzero);
-
-        encoder.data = theta*1000.0;
+        encoder.data =  theta*1000. - InitEnco.data;
     }
+}
+
+void InitializeCallBack(const std_msgs::String::ConstPtr &msg){
+    InitEnco.data = encoder.data;
 }
 
 int main (int argc, char** argv){
@@ -67,6 +72,7 @@ int main (int argc, char** argv){
     ros::NodeHandle nh;
 
     ros::Publisher read_pub = nh.advertise<std_msgs::Int16>("/encoder_theta", 1000);
+    ros::Subscriber init_sub = nh.subscribe("/initialize", 1, InitializeCallBack);
 
     try
     {
